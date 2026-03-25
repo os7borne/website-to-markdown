@@ -1,5 +1,5 @@
 // Use relative URLs to call our proxy server
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 /**
  * Extract all URLs from a webpage (via proxy)
