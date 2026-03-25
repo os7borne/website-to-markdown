@@ -26,9 +26,13 @@ export function CrawlProgress({ status, progress, urls, currentUrl, onCancel, me
           ? 'Finding pages (following pagination)...' 
           : 'Finding pages...';
       case 'converting':
-        return `Converting page ${current} of ${total}`;
+        return methods.includes('manual')
+          ? `Converting URL ${current} of ${total}`
+          : `Converting page ${current} of ${total}`;
       case 'complete':
-        return `Complete! ${total} pages converted`;
+        return methods.includes('manual')
+          ? `Complete! ${total} URLs converted`
+          : `Complete! ${total} pages converted`;
       case 'error':
         return 'Conversion failed';
       default:
@@ -104,7 +108,8 @@ export function CrawlProgress({ status, progress, urls, currentUrl, onCancel, me
 
       {urls.length > 0 && status !== 'extracting' && (
         <p className="text-xs text-gray-500 mt-2">
-          {urls.length} pages total
+          {urls.length} {methods.includes('manual') ? 'URLs' : 'pages'} total
+          {methods.includes('manual') && <span className="ml-1">(manual mode)</span>}
         </p>
       )}
     </div>

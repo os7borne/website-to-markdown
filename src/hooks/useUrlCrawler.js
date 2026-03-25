@@ -22,6 +22,7 @@ export function useUrlCrawler() {
     }));
   }, []);
 
+  // Start with automatic URL extraction (crawl mode)
   const start = useCallback(async (url, options = {}) => {
     isCancelledRef.current = false;
 
@@ -62,6 +63,39 @@ export function useUrlCrawler() {
       urls = [{ url, title: url }];
     }
 
+    // Proceed to conversion
+    await convertExtractedUrls(urls, extractionMethods, options);
+  }, []);
+
+  // Start with manually provided URLs (skip extraction)
+  const startManual = useCallback(async (manualUrls, options = {}) => {
+    isCancelledRef.current = false;
+
+    if (!manualUrls || manualUrls.length === 0) {
+      setState(prev => ({
+        ...prev,
+        status: 'error',
+        error: 'No URLs provided',
+      }));
+      return;
+    }
+
+    // Skip extraction, go directly to conversion
+    setState({
+      status: 'converting',
+      progress: { current: 0, total: manualUrls.length },
+      urls: manualUrls,
+      results: [],
+      error: null,
+      currentUrl: null,
+      methods: ['manual'],
+    });
+
+    await convertExtractedUrls(manualUrls, ['manual'], options);
+  }, []);
+
+  // Shared conversion logic
+  const convertExtractedUrls = async (urls, extractionMethods, options) => {
     setState(prev => ({
       ...prev,
       status: 'converting',
@@ -101,11 +135,12 @@ export function useUrlCrawler() {
         error: err.message,
       }));
     }
-  }, []);
+  };
 
   return {
     ...state,
     start,
+    startManual,
     cancel,
     isLoading: state.status === 'extracting' || state.status === 'converting',
   };

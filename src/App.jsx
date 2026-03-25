@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { useUrlCrawler } from './hooks/useUrlCrawler';
 import { UrlInput } from './components/UrlInput';
+import { ManualUrlInput } from './components/ManualUrlInput';
 import { CrawlProgress } from './components/CrawlProgress';
 import { ResultsList } from './components/ResultsList';
-import { FileText } from 'lucide-react';
+import { FileText, Globe, ListPlus } from 'lucide-react';
 
 function App() {
-  const { status, progress, results, error, urls, currentUrl, methods, start, cancel, isLoading } = useUrlCrawler();
+  const { status, progress, results, error, urls, currentUrl, methods, start, startManual, cancel, isLoading } = useUrlCrawler();
+  const [activeTab, setActiveTab] = useState('crawl'); // 'crawl' | 'manual'
 
   const showProgress = status === 'extracting' || status === 'converting' || status === 'complete' || status === 'error';
   const showResults = results.length > 0;
@@ -22,13 +25,49 @@ function App() {
             Website to Markdown
           </h1>
           <p className="text-gray-600">
-            Convert any website to Markdown. Enter a URL and we'll crawl all pages.
+            Convert any website to Markdown. Crawl pages automatically or add URLs manually.
           </p>
         </div>
 
+        {/* Tabs */}
+        {!isLoading && (
+          <div className="mb-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+              <div className="flex">
+                <button
+                  onClick={() => setActiveTab('crawl')}
+                  className={`flex-1 flex items-center justify-center py-2.5 px-4 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === 'crawl'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <Globe className="h-4 w-4 mr-2" />
+                  Auto Crawl
+                </button>
+                <button
+                  onClick={() => setActiveTab('manual')}
+                  className={`flex-1 flex items-center justify-center py-2.5 px-4 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === 'manual'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <ListPlus className="h-4 w-4 mr-2" />
+                  Add URLs Manually
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* URL Input */}
         <div className="mb-6">
-          <UrlInput onStart={start} isLoading={isLoading} />
+          {activeTab === 'crawl' ? (
+            <UrlInput onStart={start} isLoading={isLoading} />
+          ) : (
+            <ManualUrlInput onStart={startManual} isLoading={isLoading} />
+          )}
         </div>
 
         {/* Error Message */}

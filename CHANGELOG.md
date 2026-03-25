@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Manual URL input mode - add individual URLs instead of crawling
+  - New tabbed interface to switch between "Auto Crawl" and "Add URLs Manually" modes
+  - Add URLs one by one with validation
+  - Bulk paste support - paste multiple URLs (one per line) to add them all at once
+  - Remove individual URLs before conversion
+  - Duplicate detection to prevent adding the same URL twice
+  - Skip extraction phase and convert directly (faster for known URLs)
+  - New `ManualUrlInput` component with URL list management
+
+### Fixed
+- URL extraction now respects the input URL path
+  - When entering `https://example.com/path/`, only URLs within `/path/*` are extracted
+  - Previously crawled the entire root domain regardless of input path
+  - Applied to both HTML extraction and sitemap parsing
+
+### Added
 - Vercel deployment support with serverless functions
   - Added `vercel.json` configuration file
   - Created `api/extract.js` serverless function for URL extraction

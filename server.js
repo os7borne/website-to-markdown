@@ -42,13 +42,16 @@ async function fetchSitemap(baseUrl) {
   return null;
 }
 
-async function extractFromHtml(url) {
+async function extractFromHtml(url, basePath = null) {
   const response = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MarkdownBot/1.0)' },
   });
   if (!response.ok) throw new Error(response.statusText);
   const html = await response.text();
-  const baseHostname = new URL(url).hostname;
+  const baseUrlObj = new URL(url);
+  const baseHostname = baseUrlObj.hostname;
+  // Extract base path from input URL (e.g., /insights/memos from /insights/memos/page/2)
+  const basePathPrefix = basePath || baseUrlObj.pathname.replace(/\/[^\/]*$/, '/');
   const urls = new Map();
   
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
@@ -63,39 +66,58 @@ async function extractFromHtml(url) {
         href.startsWith('mailto:')) continue;
     try {
       const absolute = new URL(href, url).href;
-      if (new URL(absolute).hostname === baseHostname && !urls.has(absolute)) {
-        urls.set(absolute, { url: absolute, title: text || absolute });
+      const absoluteUrl = new URL(absolute);
+      // Check hostname matches AND path starts with base path prefix
+      if (absoluteUrl.hostname === baseHostname && !urls.has(absolute)) {
+        // Only include URLs within the same path section
+        if (absoluteUrl.pathname.startsWith(basePathPrefix) || absoluteUrl.pathname === basePathPrefix.slice(0, -1)) {
+          urls.set(absolute, { url: absolute, title: text || absolute });
+        }
       }
     } catch {}
   }
   return { urls, html };
 }
 
-async function fetchPagination(baseUrl, html, maxPages = 3) {
+async function fetchPagination(baseUrl, html, maxPages = 3, basePath = '/') {
   const allUrls = new Map();
   const patterns = [
     /<a[^>]*href=["']([^"']*\?page[=\/]\d+[^"']*)["'][^>]*>/gi,
-    /<a[^>]*href=["']([^"']*\/page[\/]?(?:\d+)[^"']*)["'][^>]*>/gi,
+    /<a[^>]*href=["']([^"']*\/page[\/](?:\d+)[^"']*)["'][^>]*>/gi,
   ];
   
   const links = new Set();
   for (const regex of patterns) {
     let m; while ((m = regex.exec(html)) !== null) {
-      try { links.add(new URL(m[1], baseUrl).href); } catch {}
+      try { 
+        const linkUrl = new URL(m[1], baseUrl).href;
+        const linkUrlObj = new URL(linkUrl);
+        // Only include pagination links within the same base path
+        if (linkUrlObj.pathname.startsWith(basePath)) {
+          links.add(linkUrl);
+        }
+      } catch {}
     }
   }
   
   const nextRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>\s*(?:next|>|»)\s*<\/a>/gi;
   let nm; while ((nm = nextRegex.exec(html)) !== null) {
-    try { links.add(new URL(nm[1], baseUrl).href); } catch {}
+    try { 
+      const linkUrl = new URL(nm[1], baseUrl).href;
+      const linkUrlObj = new URL(linkUrl);
+      // Only include next links within the same base path
+      if (linkUrlObj.pathname.startsWith(basePath)) {
+        links.add(linkUrl);
+      }
+    } catch {}
   }
   
-  console.log(`Found ${links.size} pagination links`);
+  console.log(`Found ${links.size} pagination links within ${basePath}`);
   let fetched = 0;
   for (const pageUrl of links) {
     if (fetched >= maxPages) break;
     try {
-      const result = await extractFromHtml(pageUrl);
+      const result = await extractFromHtml(pageUrl, basePath);
       result.urls.forEach((v, k) => { if (!allUrls.has(k)) allUrls.set(k, v); });
       fetched++;
     } catch {}
@@ -110,20 +132,29 @@ app.get('/api/extract', async (req, res) => {
   const urls = new Map();
   const methods = [];
   const baseHostname = new URL(url).hostname;
+  const basePath = new URL(url).pathname.replace(/\/[^\/]*$/, '/');
   
   const sitemap = await fetchSitemap(url);
   if (sitemap) {
-    sitemap.forEach(u => { try { if (new URL(u).hostname === baseHostname) urls.set(u, {url: u, title: u}); } catch {} });
+    sitemap.forEach(u => { 
+      try { 
+        const sitemapUrl = new URL(u);
+        // Only include sitemap URLs within the same base path
+        if (sitemapUrl.hostname === baseHostname && sitemapUrl.pathname.startsWith(basePath)) {
+          urls.set(u, {url: u, title: u});
+        } 
+      } catch {} 
+    });
     methods.push('sitemap');
   }
   
   try {
-    const result = await extractFromHtml(url);
+    const result = await extractFromHtml(url, basePath);
     result.urls.forEach((v, k) => urls.set(k, v));
     methods.push('html');
     
     if (paginate === 'true') {
-      const paginated = await fetchPagination(url, result.html, parseInt(maxPages, 10));
+      const paginated = await fetchPagination(url, result.html, parseInt(maxPages, 10), basePath);
       paginated.forEach((v, k) => { if (!urls.has(k)) urls.set(k, v); });
       methods.push('pagination');
     }
